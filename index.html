@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chessing — Dual Ladder Chess Platform</title>
+  <link rel="stylesheet" href="standalone/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <h1>♟ Chessing</h1>
+      <p class="sub">Standard + HCF competitive circuit</p>
+      <nav id="nav"></nav>
+      <section class="card">
+        <h3>Quick Queue</h3>
+        <button data-queue="elo">Ranked Standard Elo</button>
+        <button data-queue="hcf">HCF Competitive</button>
+        <button data-queue="casual">Casual</button>
+      </section>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h2 id="viewTitle">Dashboard</h2>
+          <p id="viewSubtitle">Play, train, review, and climb both ladders.</p>
+        </div>
+        <div class="pillset">
+          <span class="pill">Online 1,284</span>
+          <span class="pill">Live games 423</span>
+          <span class="pill">HCF Season 8</span>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view active"></section>
+      <section id="play" class="view"></section>
+      <section id="puzzles" class="view"></section>
+      <section id="bots" class="view"></section>
+      <section id="analysis" class="view"></section>
+      <section id="leaderboards" class="view"></section>
+      <section id="profile" class="view"></section>
+      <section id="hcf" class="view"></section>
+    </main>
+  </div>
+
+  <script src="standalone/vendor/chess.js"></script>
+  <script src="standalone/app.js"></script>
+</body>
+</html>
