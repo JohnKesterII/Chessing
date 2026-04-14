@@ -1,197 +1,85 @@
 /* global Chess */
-const PIECE = {p:'♟',r:'♜',n:'♞',b:'♝',q:'♛',k:'♚',P:'♙',R:'♖',N:'♘',B:'♗',Q:'♕',K:'♔'};
-const navItems = [
-  ['dashboard','Dashboard'],['play','Live Play'],['puzzles','Puzzles'],['bots','Bots'],['analysis','Analysis'],['leaderboards','Leaderboards'],['profile','Profile'],['hcf','HCF Hub']
-];
-const state = {
-  user: JSON.parse(localStorage.getItem('chessing_user')||'{"name":"HamrockPlayer","country":"US","bio":"Dual-ladder grinder.","elo":1548,"hcf":1482,"puzzle":1620,"wins":34,"losses":25,"draws":12,"hcfTitle":"Candidate Master"}'),
-  history: JSON.parse(localStorage.getItem('chessing_history')||'[]'),
-  puzzles: [
-    {id:1,fen:'6k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 1',theme:'mate in 1',line:['g2g3']},
-    {id:2,fen:'r1bqkbnr/pppp1ppp/2n5/4p3/3P4/5N2/PPP1PPPP/RNBQKB1R b KQkq - 1 3',theme:'fork',line:['e5e4','f3g5']},
-    {id:3,fen:'4k3/8/8/8/8/8/5K2/6R1 w - - 0 1',theme:'mate in 2',line:['g1e1','e8d7','e1d1']}
-  ],
-  leaderboard: JSON.parse(localStorage.getItem('chessing_lb')||'[]')
+const navItems=[['dashboard','Dashboard'],['play','Live Play'],['puzzles','Puzzles'],['bots','Bots'],['analysis','Analysis'],['leaderboards','Leaderboards'],['profile','Profile'],['settings','Settings'],['hcf','HCF Hub']];
+const PIECES=['K','Q','R','B','N','P'];
+const THEMES={
+  neo:{name:'Neo Rounded',fillW:'#fbfdff',fillB:'#1f2432',stroke:'#202535',shape:'round'},
+  clean:{name:'Clean L-Style',fillW:'#ffffff',fillB:'#2a3042',stroke:'#3a4865',shape:'clean'},
+  classic:{name:'Classic Tournament',fillW:'#f4ead4',fillB:'#31261d',stroke:'#201810',shape:'classic'},
+  modern:{name:'Modern Minimal',fillW:'#f2f7ff',fillB:'#182033',stroke:'#3f5578',shape:'modern'},
+  premium:{name:'Premium Slate',fillW:'#f0f4f8',fillB:'#0f1728',stroke:'#42506d',shape:'premium'}
 };
-if(!state.leaderboard.length){
-  state.leaderboard = Array.from({length:18},(_,i)=>({name:`Player${i+1}`,elo:2200-i*32,hcf:2140-i*28,puzzle:2300-i*30,country:['US','IN','NO','DE','BR'][i%5]}));
-}
-function save(){
-  localStorage.setItem('chessing_user',JSON.stringify(state.user));
-  localStorage.setItem('chessing_history',JSON.stringify(state.history));
-  localStorage.setItem('chessing_lb',JSON.stringify(state.leaderboard));
-}
+const BOARD_THEMES={walnut:['#f2e0c4','#b88955'],slate:['#dce5f8','#7f90b1'],emerald:['#d7efe6','#7ba98f'],obsidian:['#e3dfda','#7d6856']};
 
-const nav = document.getElementById('nav');
-navItems.forEach(([id,label])=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>show(id);b.dataset.id=id;nav.appendChild(b);});
-function show(id){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
-  document.getElementById('viewTitle').textContent = navItems.find(n=>n[0]===id)[1];
-}
-show('dashboard');
+const state={
+  session:JSON.parse(localStorage.getItem('chessing_session')||'null'),
+  users:JSON.parse(localStorage.getItem('chessing_users')||'{}'),
+  lb:JSON.parse(localStorage.getItem('chessing_lb')||'[]'),
+  puzzles:[
+    {id:1,fen:'r1bq1rk1/pp1n1ppp/2p1pn2/2bp4/2B5/2NP1NP1/PP2PPBP/R1BQ1RK1 w - - 0 8',theme:'pin',best:'c4d5',exp:'Bishop takes d5 wins central control and tactical pressure.'},
+    {id:2,fen:'6k1/5ppp/8/8/8/7Q/5PPP/6K1 w - - 0 1',theme:'mate in 1',best:'h3b8',exp:'Queen to b8 is immediate mate on the back rank.'},
+    {id:3,fen:'r2q1rk1/pp2bppp/2n2n2/2bp4/3P4/2N1PN2/PPQ1BPPP/R1B2RK1 w - - 0 9',theme:'fork',best:'c3d5',exp:'Knight jump forks queen and bishop motifs next move.'}
+  ]
+};
+if(!state.lb.length) state.lb=Array.from({length:22},(_,i)=>({name:`Master${i+1}`,country:['US','IN','NO','DE','AR'][i%5],elo:2300-i*28,hcf:2260-i*24,puzzle:2400-i*27}));
 
-function renderDashboard(){
-  const v=document.getElementById('dashboard');
-  v.innerHTML=`<div class="grid g3">
-    <div class="panel"><div class="muted">Standard Elo</div><div class="kpi">${state.user.elo}</div><span class="badge elo">Public ladder</span></div>
-    <div class="panel"><div class="muted">HCF Rating</div><div class="kpi">${state.user.hcf}</div><span class="badge hcf">Federation circuit</span></div>
-    <div class="panel"><div class="muted">Puzzle Rating</div><div class="kpi">${state.user.puzzle}</div><div class="muted">Streak ${puzzleSession.streak}</div></div>
-  </div>
-  <div class="grid g2" style="margin-top:14px">
-    <div class="panel"><h3>Featured events</h3><ul><li>HCF Swiss #42 starts in 3h</li><li>Elite Arena 5+0 tonight</li><li>Daily puzzle championship live</li></ul></div>
-    <div class="panel"><h3>Recent match history</h3>${renderRecentTable(6)}</div>
-  </div>`;
-}
-function renderRecentTable(n){
-  const rows = state.history.slice(0,n).map(g=>`<tr><td>${g.mode}</td><td>${g.result}</td><td>${g.eloDelta>0?'+':''}${g.eloDelta}/${g.hcfDelta>0?'+':''}${g.hcfDelta}</td><td>${g.time}</td></tr>`).join('');
-  return `<table><thead><tr><th>Mode</th><th>Result</th><th>Δ Elo/HCF</th><th>Date</th></tr></thead><tbody>${rows||'<tr><td colspan="4" class="muted">No games yet.</td></tr>'}</tbody></table>`;
-}
+const defaults={bio:'Chessing competitor.',country:'US',avatar:'♟',elo:1550,hcf:1480,puzzle:1620,wins:0,losses:0,draws:0,history:[],openingStats:{'Sicilian Defense':12,'Queen Gambit':9},settings:{pieceTheme:'neo',boardTheme:'walnut',coords:true,highlight:'#4ade80',arrow:'#f97316',sound:'classic',animation:'smooth',mode:'dark',time:'3+2',fav:'hcf'}};
+let user=null,game=new Chess(),selected=null,legal=[],mode='casual',boardSide='w',puzzle={idx:0,streak:0,rush:0};
+let sf=null,sfReady=false,sfCb=()=>{};
 
-let game = new Chess(); let selected=null; let legal=[]; let mode='casual';
-function buildBoard(containerId,side='w'){
-  const container=document.getElementById(containerId); container.innerHTML='';
-  const board=document.createElement('div');board.className='board';container.appendChild(board);
-  const squares = side==='w' ? [...'87654321'].flatMap(r=>[...'abcdefgh'].map(f=>f+r)) : [...'12345678'].flatMap(r=>[...'hgfedcba'].map(f=>f+r));
-  squares.forEach(s=>{const sq=document.createElement('button');sq.className=`sq ${((s.charCodeAt(0)-97+parseInt(s[1]))%2?'dark':'light')}`;sq.dataset.s=s;sq.onclick=()=>onSquare(s);board.appendChild(sq);});
-  drawBoard();
+function save(){localStorage.setItem('chessing_users',JSON.stringify(state.users));localStorage.setItem('chessing_session',JSON.stringify(state.session));localStorage.setItem('chessing_lb',JSON.stringify(state.lb));}
+function requireAuth(){const gate=document.getElementById('authGate');if(user){gate.classList.remove('active');return;}gate.classList.add('active');gate.innerHTML=`<div class='auth-card'><h2>Welcome to Chessing</h2><p class='muted'>Create an account or sign in to unlock full play, ratings, profile customization, and HCF competition.</p><div class='grid g2'><div><h3>Sign up</h3><input id='suName' placeholder='Username'/><input id='suPass' type='password' placeholder='Password'/><button class='btn' id='signup'>Create account</button></div><div><h3>Login</h3><input id='liName' placeholder='Username'/><input id='liPass' type='password' placeholder='Password'/><button class='btn' id='login'>Login</button></div></div></div>`;
+  document.getElementById('signup').onclick=()=>{const n=suName.value.trim(),p=suPass.value;if(!n||!p)return alert('Enter username/password');if(state.users[n])return alert('Username exists');state.users[n]={...defaults,name:n,password:p};state.session={name:n};user=state.users[n];save();bootstrap();};
+  document.getElementById('login').onclick=()=>{const n=liName.value.trim(),p=liPass.value;if(!state.users[n]||state.users[n].password!==p)return alert('Invalid credentials');state.session={name:n};user=state.users[n];save();bootstrap();};
 }
-function drawBoard(){
-  document.querySelectorAll('.sq').forEach(el=>{const p=game.get(el.dataset.s);el.textContent=p?PIECE[p.color==='w'?p.type.toUpperCase():p.type]:'';el.classList.remove('sel','legal');
-    if(selected===el.dataset.s) el.classList.add('sel');
-    if(legal.includes(el.dataset.s)) el.classList.add('legal');
-  });
-  const m=document.getElementById('moves');
-  if(m){const h=game.history({verbose:true});m.innerHTML=h.map((mv,i)=>`<div class='move'>${i+1}. ${mv.san}</div>`).join('');}
-}
-function onSquare(s){
-  if(!selected){
-    const p=game.get(s); if(!p || p.color!==game.turn()) return;
-    selected=s; legal=game.moves({square:s,verbose:true}).map(m=>m.to); drawBoard(); return;
-  }
-  const mv=game.move({from:selected,to:s,promotion:'q'});
-  selected=null; legal=[];
-  if(!mv){drawBoard(); return;}
-  drawBoard();
-  postMove();
-}
-function evalMaterial(ch){
-  const v={p:100,n:320,b:330,r:500,q:900,k:0}; let s=0;
-  for(const r of ch.board()) for(const p of r||[]) if(p) s += (p.color==='w'?1:-1)*v[p.type];
-  return s;
-}
-function bestMove(depth=2){
-  const maximizing=game.turn()==='w';
-  function search(ch,d,a,b,max){ if(d===0||ch.isGameOver()) return evalMaterial(ch);
-    const moves=ch.moves({verbose:true});
-    if(max){let val=-1e9; for(const m of moves){ch.move(m);val=Math.max(val,search(ch,d-1,a,b,false));ch.undo();a=Math.max(a,val); if(b<=a) break;} return val;}
-    let val=1e9; for(const m of moves){ch.move(m);val=Math.min(val,search(ch,d-1,a,b,true));ch.undo();b=Math.min(b,val); if(b<=a) break;} return val;
-  }
-  let best=null; let bestVal=maximizing?-1e9:1e9;
-  for(const m of game.moves({verbose:true})){
-    game.move(m); const val=search(game,depth-1,-1e9,1e9,!maximizing); game.undo();
-    if((maximizing && val>bestVal)||(!maximizing && val<bestVal)){bestVal=val;best=m;}
-  }
-  return {best,bestVal};
-}
-function postMove(){
-  const ev=document.getElementById('eval'); if(ev){const sc=evalMaterial(game)/100;ev.textContent=`Eval ${sc>0?'+':''}${sc.toFixed(2)} | FEN ${game.fen()}`;}
-  if(game.isGameOver()){finishGame();return;}
-  if(mode==='bot' && game.turn()==='b'){
-    setTimeout(()=>{const bm=bestMove(2).best || game.moves({verbose:true})[0];game.move(bm);drawBoard();postMove();}, 400+Math.random()*800);
-  }
-}
-function finishGame(){
-  const result = game.isDraw()?'Draw':(game.turn()==='w'?'0-1':'1-0');
-  let eloDelta=0,hcfDelta=0;
-  if(mode==='elo') eloDelta=result==='1-0'?12:result==='0-1'?-9:2;
-  if(mode==='hcf') hcfDelta=result==='1-0'?16:result==='0-1'?-12:1;
-  if(mode==='bot'){eloDelta=result==='1-0'?8:-6;}
-  state.user.elo += eloDelta; state.user.hcf += hcfDelta;
-  state.history.unshift({mode:mode.toUpperCase(),result,eloDelta,hcfDelta,time:new Date().toLocaleString()}); save();
-  alert(`Game over ${result}. Elo ${eloDelta>=0?'+':''}${eloDelta}, HCF ${hcfDelta>=0?'+':''}${hcfDelta}`);
-  renderAll();
-}
+function setUser(){if(state.session&&state.users[state.session.name]) user=state.users[state.session.name]; else user=null;document.getElementById('userChip').textContent=user?`${user.name} • ${user.elo}`:'Offline';}
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.getElementById('viewTitle').textContent=navItems.find(x=>x[0]===id)[1];}
 
-function renderPlay(){
-  const v=document.getElementById('play');
-  v.innerHTML=`<div class='panel board-wrap'><div id='playBoard'></div>
-  <div class='panel'><h3>Game controls</h3><p class='muted'>Queue mode impacts rating updates and pairings.</p>
-    <select id='modeSel'><option value='casual'>Casual</option><option value='elo'>Ranked Elo</option><option value='hcf'>HCF Competitive</option><option value='bot'>Vs Bot</option></select>
-    <div style='display:flex;gap:8px;margin-top:8px'><button class='btn' id='newGame'>New game</button><button class='btn' id='flip'>Flip board</button></div>
-    <p id='eval' class='muted'></p><h4>Move list</h4><div class='moves' id='moves'></div></div></div>`;
-  let side='w';
-  buildBoard('playBoard',side);
-  document.getElementById('newGame').onclick=()=>{mode=document.getElementById('modeSel').value;game=new Chess();selected=null;legal=[];drawBoard();if(mode==='bot'&&game.turn()==='b')postMove();};
-  document.getElementById('modeSel').onchange=e=>mode=e.target.value;
-  document.getElementById('flip').onclick=()=>{side=side==='w'?'b':'w';buildBoard('playBoard',side);};
-}
-
-const puzzleSession={index:0,streak:0,survivalLives:3};
-function renderPuzzles(){
-  const v=document.getElementById('puzzles'); const p=state.puzzles[puzzleSession.index%state.puzzles.length];
-  v.innerHTML=`<div class='grid g2'><div class='panel'><h3>Daily Puzzle</h3><p><strong>${p.theme}</strong> • rated</p><div id='puzzleBoard'></div><p id='puzzleInfo' class='muted'>Find the best move.</p>
-    <div style='display:flex;gap:8px;margin-top:8px'><button class='btn' id='hint'>Hint</button><button class='btn' id='retry'>Retry</button><button class='btn' id='nextPuzzle'>Next</button></div></div>
-    <div class='panel'><h3>Puzzle Arena</h3><p>Streak: <strong>${puzzleSession.streak}</strong> | Survival lives: <strong>${puzzleSession.survivalLives}</strong></p>
-    <p>Categories: mate in 1/2, forks, pins, skewers, endgames, defensive tactics, opening traps, calculation.</p>
-    <p class='muted'>Puzzle rating updates after each solve.</p></div></div>`;
-  const pg=new Chess(p.fen);window.pgame=pg;window.psel=null;
-  function drawP(){document.querySelectorAll('#puzzleBoard .sq').forEach(el=>{const pc=pg.get(el.dataset.s);el.textContent=pc?PIECE[pc.color==='w'?pc.type.toUpperCase():pc.type]:'';});}
-  const holder=document.getElementById('puzzleBoard'); holder.innerHTML=''; const board=document.createElement('div');board.className='board';holder.appendChild(board);
-  [...'87654321'].forEach(r=>[...'abcdefgh'].forEach(f=>{const s=f+r;const sq=document.createElement('button');sq.className=`sq ${((f.charCodeAt(0)-97+parseInt(r))%2?'dark':'light')}`;sq.dataset.s=s;sq.onclick=()=>{
-      if(!window.psel){const pp=pg.get(s);if(!pp||pp.color!==pg.turn()) return;window.psel=s;return;}
-      const mv=pg.move({from:window.psel,to:s,promotion:'q'});window.psel=null;if(!mv)return;drawP();
-      const uci=mv.from+mv.to; if(uci===p.line[0]){document.getElementById('puzzleInfo').textContent='Correct! Rating +8. Explanation: forcing tactical motif succeeded.';state.user.puzzle+=8;puzzleSession.streak++;}
-      else {document.getElementById('puzzleInfo').textContent='Not best. Rating -6. Try again.';state.user.puzzle-=6;puzzleSession.streak=0;puzzleSession.survivalLives=Math.max(0,puzzleSession.survivalLives-1);} save(); renderProfile(); renderDashboard();
-    };board.appendChild(sq);})); drawP();
-  document.getElementById('hint').onclick=()=>document.getElementById('puzzleInfo').textContent=`Hint: starts with ${p.line[0].slice(0,2)}→${p.line[0].slice(2,4)}`;
-  document.getElementById('retry').onclick=()=>renderPuzzles();
-  document.getElementById('nextPuzzle').onclick=()=>{puzzleSession.index++;renderPuzzles();};
-}
-
-function renderBots(){
-  const bots=[['Scout',800,'human-like'],['Viper',1300,'aggressive'],['Wall',1600,'defensive'],['Atlas',2200,'engine-backed']];
-  const v=document.getElementById('bots');
-  v.innerHTML=`<div class='panel'><h3>Bot roster</h3><table><thead><tr><th>Bot</th><th>Elo</th><th>Style</th><th></th></tr></thead><tbody>${bots.map(b=>`<tr><td>${b[0]}</td><td>${b[1]}</td><td>${b[2]}</td><td><button class='btn pick' data-elo='${b[1]}'>Play</button></td></tr>`).join('')}</tbody></table></div>`;
-  v.querySelectorAll('.pick').forEach(btn=>btn.onclick=()=>{show('play');mode='bot';document.getElementById('modeSel').value='bot';game=new Chess();drawBoard();alert(`Matched vs bot ${btn.dataset.elo}`);});
-}
-function renderAnalysis(){
-  const v=document.getElementById('analysis');
-  v.innerHTML=`<div class='grid g2'><div class='panel'><h3>Analysis Board</h3><textarea id='fenInput' rows='3' placeholder='Paste FEN'></textarea><div style='display:flex;gap:8px;margin-top:8px'><button class='btn' id='loadFen'>Load FEN</button><button class='btn' id='engine'>Top 3 lines</button><button class='btn' id='pgn'>Export PGN</button></div><div id='anaBoard' style='margin-top:10px'></div></div>
-  <div class='panel'><h3>Engine review</h3><div id='lines' class='muted'>Run engine for multipv lines, move classifications, and centipawn trend.</div><div id='review'></div></div></div>`;
-  const a=new Chess();window.ana=a;buildBoard('anaBoard');
-  document.getElementById('loadFen').onclick=()=>{const fen=document.getElementById('fenInput').value.trim();if(!fen) return;try{a.load(fen);game=a;drawBoard();}catch{alert('Invalid FEN');}};
-  document.getElementById('engine').onclick=()=>{
-    const lines=[];const moves=a.moves({verbose:true}).slice(0,3);moves.forEach((m,i)=>{a.move(m);lines.push(`#${i+1} ${m.san} eval ${(evalMaterial(a)/100).toFixed(2)}`);a.undo();});
-    document.getElementById('lines').innerHTML=lines.join('<br>')||'No legal moves.';
-    document.getElementById('review').innerHTML=`<p>Accuracy: ${Math.max(55,Math.min(99,90-Math.abs(evalMaterial(a))/30)).toFixed(1)}%</p><p>Opening: ${a.history().length<3?'Unclassified':'Queen Pawn Structures'}</p>`;
+function boardThemeColors(){return BOARD_THEMES[user.settings.boardTheme]||BOARD_THEMES.walnut;}
+function pieceSvg(code){const t=THEMES[user.settings.pieceTheme]||THEMES.neo;const isW=code[0]==='w';const fill=isW?t.fillW:t.fillB;const s=t.stroke;
+  const kind=code[1];const shapes={
+    P:`<circle cx='50' cy='34' r='15'/><path d='M30 84h40l-6-26H36z'/>`,
+    N:`<path d='M28 84h44l-4-16-17-10 12-19-8-11-13 5-14 19 8 14-8 18z'/><circle cx='57' cy='37' r='3' fill='${s}'/>`,
+    B:`<path d='M50 20l12 12-8 9 8 9-12 28-12-28 8-9-8-9z'/><circle cx='50' cy='15' r='5'/>`,
+    R:`<path d='M28 84h44l-4-14H32z'/><path d='M34 70h32l-4-30H38z'/><path d='M33 34h8v-9h6v9h6v-9h6v9h8v6H33z'/>`,
+    Q:`<path d='M30 82h40l-4-20H34z'/><path d='M34 61l-7-25 14 7 9-11 9 11 14-7-7 25z'/><circle cx='28' cy='30' r='4'/><circle cx='42' cy='26' r='4'/><circle cx='58' cy='26' r='4'/><circle cx='72' cy='30' r='4'/>`,
+    K:`<path d='M33 84h34l-4-18H37z'/><path d='M50 22v33'/><path d='M40 32h20'/><path d='M35 66h30l-4-26H39z'/>`
   };
-  document.getElementById('pgn').onclick=()=>navigator.clipboard.writeText(a.pgn()).then(()=>alert('PGN copied'));
+  const round=t.shape==='round'?12:t.shape==='clean'?4:8;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='${fill}' stroke='${s}' stroke-width='${t.shape==='clean'?4:3}' stroke-linejoin='round' stroke-linecap='round'>${shapes[kind]}</g><rect x='2' y='2' width='96' height='96' rx='${round}' fill='none' stroke='none'/></svg>`)}`;
 }
-function renderLeaderboards(){
-  const v=document.getElementById('leaderboards');
-  const r=state.leaderboard.slice().sort((a,b)=>b.elo-a.elo);
-  v.innerHTML=`<div class='grid g2'><div class='panel'><h3>Standard Elo</h3>${table(r,'elo')}</div><div class='panel'><h3>HCF Ladder</h3>${table(state.leaderboard.slice().sort((a,b)=>b.hcf-a.hcf),'hcf')}</div></div>`;
-}
-function table(arr,key){return `<table><thead><tr><th>#</th><th>Player</th><th>${key.toUpperCase()}</th><th>Country</th></tr></thead><tbody>${arr.map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td>${p[key]}</td><td>${p.country}</td></tr>`).join('')}</tbody></table>`}
-function renderProfile(){
-  const v=document.getElementById('profile');
-  v.innerHTML=`<div class='grid g2'><div class='panel'><h3>${state.user.name} <span class='badge hcf'>${state.user.hcfTitle}</span></h3><p>${state.user.bio}</p><p>${state.user.country}</p>
-  <p>Standard Elo: <strong>${state.user.elo}</strong><br>HCF: <strong>${state.user.hcf}</strong><br>Puzzle: <strong>${state.user.puzzle}</strong></p>
-  <p>W/L/D: ${state.user.wins}/${state.user.losses}/${state.user.draws}</p></div><div class='panel'><h3>Match archive</h3>${renderRecentTable(20)}</div></div>`;
-}
-function renderHcf(){
-  const v=document.getElementById('hcf');
-  v.innerHTML=`<div class='grid g2'><div class='panel'><h3>Hamrock Chess Federation</h3><p>Official competitive circuit with stricter pairing and anti-cheat protocol.</p>
-  <p>Current rating: <strong>${state.user.hcf}</strong> • title: <strong>${state.user.hcfTitle}</strong></p>
-  <button class='btn' id='hcfQueue'>Join HCF ranked queue</button>
-  <button class='btn' id='hcfSwiss'>Register Swiss event</button></div>
-  <div class='panel'><h3>HCF seasonal standings</h3>${table(state.leaderboard.slice().sort((a,b)=>b.hcf-a.hcf),'hcf')}</div></div>`;
-  document.getElementById('hcfQueue').onclick=()=>{show('play');mode='hcf';document.getElementById('modeSel').value='hcf';alert('Entered HCF queue (local matchmaking simulation).');};
-  document.getElementById('hcfSwiss').onclick=()=>alert('Registered for HCF Swiss #42');
-}
-function renderAll(){renderDashboard();renderPlay();renderPuzzles();renderBots();renderAnalysis();renderLeaderboards();renderProfile();renderHcf();}
-renderAll();
 
-document.querySelectorAll('[data-queue]').forEach(b=>b.onclick=()=>{show('play');mode=b.dataset.queue;document.getElementById('modeSel').value=mode;});
+function buildBoard(elId){const c=document.getElementById(elId);c.innerHTML=`<div class='board-area'><div class='coords ${user.settings.coords?'':'hidden'}' id='coords'></div><div class='board' id='board'></div></div>`;const b=document.getElementById('board');const [light,dark]=boardThemeColors();
+  const sqs=(boardSide==='w'?[...'87654321'].flatMap(r=>[...'abcdefgh'].map(f=>f+r)):[...'12345678'].flatMap(r=>[...'hgfedcba'].map(f=>f+r)));
+  sqs.forEach(s=>{const d=document.createElement('button');d.className='sq';if((s.charCodeAt(0)-96+parseInt(s[1]))%2===0)d.classList.add('dark');d.style.background=d.classList.contains('dark')?dark:light;d.dataset.s=s;d.onclick=()=>onSquare(s);b.appendChild(d);});
+  drawCoords();drawBoard();
+}
+function drawCoords(){const c=document.getElementById('coords');if(!c)return;c.innerHTML='';const files=boardSide==='w'?'abcdefgh':'hgfedcba';const ranks=boardSide==='w'?'12345678':'87654321';[...files].forEach((f,i)=>{const s=document.createElement('span');s.className='coord-file';s.style.left=`calc(${(i+0.5)*12.5}% - 3px)`;s.textContent=f;c.appendChild(s);});[...ranks].forEach((r,i)=>{const s=document.createElement('span');s.className='coord-rank';s.style.top=`calc(${(i+0.5)*12.5}% - 6px)`;s.textContent=r;c.appendChild(s);});}
+function drawBoard(){document.querySelectorAll('#board .sq').forEach(sq=>{sq.classList.remove('sel','legal');if(selected===sq.dataset.s)sq.classList.add('sel');if(legal.includes(sq.dataset.s))sq.classList.add('legal');const p=game.get(sq.dataset.s);sq.innerHTML=p?`<img class='piece' alt='${p.color}${p.type}' src='${pieceSvg((p.color==='w'?'w':'b')+p.type.toUpperCase())}'/>`:'';});const m=document.getElementById('moves');if(m){const h=game.history({verbose:true});m.innerHTML=h.map((x,i)=>`<div class='move'>${i+1}. ${x.san}</div>`).join('');}}
+function onSquare(s){if(!selected){const p=game.get(s);if(!p||p.color!==game.turn())return;selected=s;legal=game.moves({square:s,verbose:true}).map(x=>x.to);drawBoard();return;}const mv=game.move({from:selected,to:s,promotion:'q'});selected=null;legal=[];if(!mv){drawBoard();return;}playSound();drawBoard();postMove();}
+function playSound(){if(user.settings.sound==='off')return;const ctx=new (window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();o.frequency.value=user.settings.sound==='soft'?360:520;o.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.03);}
+
+function evalLocal(ch){const v={p:100,n:320,b:330,r:500,q:900,k:0};let s=0;for(const r of ch.board())for(const p of r||[])if(p)s+=(p.color==='w'?1:-1)*v[p.type];return s;}
+function ensureStockfish(){if(sf)return;sf=new Worker('standalone/vendor/stockfish.js');sf.onmessage=e=>{const t=e.data||'';if(typeof t!=='string')return;if(t.includes('uciok'))sfReady=true;sfCb(t);};sf.postMessage('uci');sf.postMessage('setoption name MultiPV value 3');}
+function runSF(fen,cb){ensureStockfish();sfCb=(line)=>cb(line);sf.postMessage('position fen '+fen);sf.postMessage('go depth 14');}
+function postMove(){const ev=document.getElementById('eval');if(ev){const s=(evalLocal(game)/100).toFixed(2);ev.textContent=`Eval ${s>0?'+':''}${s}`;}if(game.isGameOver())return finishGame();if(mode==='bot'&&game.turn()==='b')setTimeout(()=>{let best=game.moves({verbose:true})[0];const list=game.moves({verbose:true});let val=1e9;for(const m of list){game.move(m);const x=evalLocal(game);game.undo();if(x<val){val=x;best=m;}}game.move(best);drawBoard();postMove();},500+Math.random()*700);}
+function finishGame(){const draw=game.isDraw();const result=draw?'1/2-1/2':(game.turn()==='w'?'0-1':'1-0');let dE=0,dH=0;if(mode==='elo')dE=result==='1-0'?10:result==='0-1'?-8:1;if(mode==='hcf')dH=result==='1-0'?15:result==='0-1'?-12:2;if(mode==='bot')dE=result==='1-0'?7:-5;user.elo+=dE;user.hcf+=dH;if(result==='1-0')user.wins++;else if(result==='0-1')user.losses++;else user.draws++;user.history.unshift({mode,result,date:new Date().toLocaleString(),dE,dH});save();alert(`Result ${result} | Elo ${dE>=0?'+':''}${dE} | HCF ${dH>=0?'+':''}${dH}`);renderAll();}
+
+function renderDashboard(){dashboard.innerHTML=`<div class='grid g3'><div class='panel'><div class='muted'>Standard Elo</div><div class='kpi'>${user.elo}</div></div><div class='panel'><div class='muted'>HCF Rating</div><div class='kpi'>${user.hcf}</div></div><div class='panel'><div class='muted'>Puzzle</div><div class='kpi'>${user.puzzle}</div></div></div><div class='grid g2' style='margin-top:12px'><div class='panel'><h3>Featured</h3><ul><li>HCF Swiss #42</li><li>Arena 3+2 tonight</li><li>Daily Puzzle Cup</li></ul></div><div class='panel'><h3>Recent games</h3>${historyTable(8)}</div></div>`;}
+function historyTable(n){const r=user.history.slice(0,n).map(g=>`<tr><td>${g.mode.toUpperCase()}</td><td>${g.result}</td><td>${g.dE>0?'+':''}${g.dE}/${g.dH>0?'+':''}${g.dH}</td><td>${g.date}</td></tr>`).join('');return `<table><tr><th>Mode</th><th>Result</th><th>Δ</th><th>Date</th></tr>${r||'<tr><td colspan=4 class=muted>No games yet.</td></tr>'}</table>`;}
+function renderPlay(){play.innerHTML=`<div class='panel board-shell'><div class='board-stack'><div id='playBoard'></div><div class='row'><button class='btn' id='newGame'>New game</button><button class='btn' id='flip'>Flip</button><select id='modeSel'><option value='casual'>Casual</option><option value='elo'>Ranked Elo</option><option value='hcf'>HCF Rated</option><option value='bot'>Vs Bot</option></select></div></div><div class='panel'><h3>Game room</h3><div id='eval' class='muted'>Eval +0.00</div><h4>Moves</h4><div class='moves' id='moves'></div></div></div>`;buildBoard('playBoard');modeSel.value=mode;modeSel.onchange=e=>mode=e.target.value;newGame.onclick=()=>{game=new Chess();selected=null;legal=[];drawBoard();};flip.onclick=()=>{boardSide=boardSide==='w'?'b':'w';buildBoard('playBoard');};}
+function renderPuzzles(){const p=state.puzzles[puzzle.idx%state.puzzles.length];puzzles.innerHTML=`<div class='grid g2'><div class='panel'><h3>Daily puzzle • ${p.theme}</h3><div id='pzBoard'></div><p id='pzInfo' class='muted'>Find best move.</p><div class='row'><button class='btn' id='hint'>Hint</button><button class='btn' id='retry'>Retry</button><button class='btn' id='next'>Next</button></div></div><div class='panel'><h3>Puzzle rush + survival</h3><p>Streak: <b>${puzzle.streak}</b> | Rush solved: <b>${puzzle.rush}</b></p><p class='muted'>Themes include mates, forks, pins, skewers, endgames, defensive tactics, traps.</p><p>${p.exp}</p></div></div>`;const pg=new Chess(p.fen);let sel=null;const tmp=game;game=pg;buildBoard('pzBoard');game=tmp;document.querySelectorAll('#pzBoard .sq').forEach(sq=>sq.onclick=()=>{const s=sq.dataset.s;if(!sel){const pp=pg.get(s);if(!pp||pp.color!==pg.turn())return;sel=s;return;}const mv=pg.move({from:sel,to:s,promotion:'q'});sel=null;if(!mv)return;document.getElementById('pzInfo').textContent='Moved: '+mv.san;const u=mv.from+mv.to;if(u===p.best){user.puzzle+=8;puzzle.streak++;puzzle.rush++;pzInfo.textContent=`Correct +8. ${p.exp}`;}else{user.puzzle-=6;puzzle.streak=0;pzInfo.textContent='Incorrect -6. Retry to improve tactical precision.';}save();renderProfile();renderDashboard();});hint.onclick=()=>pzInfo.textContent=`Hint: ${p.best.slice(0,2)}→${p.best.slice(2,4)}`;retry.onclick=()=>renderPuzzles();next.onclick=()=>{puzzle.idx++;renderPuzzles();};}
+function renderBots(){const bots=[['Rooklet',700,'beginner'],['Tempo',1200,'human-like'],['Fang',1700,'aggressive'],['Granite',2000,'defensive'],['Leviathan',2500,'stockfish-backed']];bots.innerHTML=`<div class='panel'><h3>Bot personalities</h3><table><tr><th>Name</th><th>Elo</th><th>Style</th><th></th></tr>${bots.map(b=>`<tr><td>${b[0]}</td><td>${b[1]}</td><td>${b[2]}</td><td><button class='btn pick' data-b='${b[0]}'>Play</button></td></tr>`).join('')}</table></div>`;document.querySelectorAll('.pick').forEach(b=>b.onclick=()=>{mode='bot';show('play');modeSel.value='bot';alert('Matched vs '+b.dataset.b);});}
+function renderAnalysis(){analysis.innerHTML=`<div class='grid g2'><div class='panel'><h3>Stockfish Analysis</h3><textarea id='fen' rows='3' placeholder='Paste FEN'></textarea><div class='row'><button class='btn' id='load'>Load FEN</button><button class='btn' id='analyze'>Analyze</button><button class='btn' id='pgn'>Copy PGN</button></div><div id='anaBoard'></div></div><div class='panel'><h3>Review</h3><div id='sfInfo' class='muted'>Ready: ${sfReady?'yes':'loading...'}</div><div id='sfLines'></div><p class='muted'>Includes eval bar proxy, depth updates, best lines, suggested continuations, and opening tag.</p></div></div>`;const a=new Chess();const tmp=game;game=a;buildBoard('anaBoard');game=tmp;load.onclick=()=>{try{a.load(fen.value.trim());game=a;drawBoard();game=tmp;}catch{alert('Invalid FEN');}};analyze.onclick=()=>{sfLines.innerHTML='';runSF(a.fen(),(line)=>{if(line.includes(' depth '))sfInfo.textContent='Live: '+line;if(line.startsWith('info')&&line.includes(' pv ')){const txt=line.split(' pv ')[1];sfLines.innerHTML+=`<div>${line.includes(' multipv 1')?'#1':line.includes(' multipv 2')?'#2':'#3'} ${txt}</div>`;}if(line.startsWith('bestmove'))sfLines.innerHTML+=`<hr><b>${line}</b><div>Opening: ${a.history().length<2?'Unclassified':'Mainline structure'} | Accuracy est: ${Math.max(55,95-Math.abs(evalLocal(a))/40).toFixed(1)}%</div>`;});};pgn.onclick=()=>navigator.clipboard.writeText(a.pgn()).then(()=>alert('PGN copied'));}
+function renderLeaderboards(){leaderboards.innerHTML=`<div class='grid g2'><div class='panel'><h3>Standard Elo</h3>${lbTable('elo')}</div><div class='panel'><h3>HCF Federation</h3>${lbTable('hcf')}</div></div>`;}
+function lbTable(k){const a=state.lb.slice().sort((x,y)=>y[k]-x[k]);return `<table><tr><th>#</th><th>Player</th><th>${k.toUpperCase()}</th><th>Country</th></tr>${a.map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td>${p[k]}</td><td>${p.country}</td></tr>`).join('')}</table>`;}
+function renderProfile(){profile.innerHTML=`<div class='grid g2'><div class='panel'><h3>${user.avatar} ${user.name} <span class='badge hcf'>HCF competitor</span></h3><p>${user.bio}</p><p>${user.country}</p><p>Elo <b>${user.elo}</b> • HCF <b>${user.hcf}</b> • Puzzle <b>${user.puzzle}</b></p><p>W/L/D ${user.wins}/${user.losses}/${user.draws}</p><p>Preferred: ${user.settings.time} • ${user.settings.fav}</p></div><div class='panel'><h3>Rating history</h3>${historyTable(20)}</div></div>`;}
+function renderSettings(){const opts=Object.entries(THEMES).map(([k,v])=>`<option value='${k}' ${user.settings.pieceTheme===k?'selected':''}>${v.name}</option>`).join('');const bopts=Object.keys(BOARD_THEMES).map(k=>`<option value='${k}' ${user.settings.boardTheme===k?'selected':''}>${k}</option>`).join('');settings.innerHTML=`<div class='panel'><h3>Personalization</h3><div class='grid g3'><label>Piece set<select id='pieceTheme'>${opts}</select></label><label>Board theme<select id='boardTheme'>${bopts}</select></label><label>Sound<select id='sound'><option>classic</option><option>soft</option><option>off</option></select></label><label>Animation<select id='anim'><option>smooth</option><option>snappy</option></select></label><label>Coordinates<select id='coords'><option value='on'>On</option><option value='off'>Off</option></select></label><label>Mode<select id='modePref'><option value='dark'>Dark</option><option value='light'>Light</option></select></label><label>Highlight<input type='color' id='hl' value='${user.settings.highlight}'/></label><label>Arrow<input type='color' id='ar' value='${user.settings.arrow}'/></label><label>Preferred time<input id='time' value='${user.settings.time}'/></label></div><div class='row'><input id='bio' value='${user.bio}' placeholder='Bio'/><input id='country' value='${user.country}' placeholder='Country'/><input id='avatar' value='${user.avatar}' placeholder='Avatar'/></div><div class='row'><button class='btn' id='saveSet'>Save settings</button><button class='btn' id='logout'>Logout</button></div></div>`;
+  sound.value=user.settings.sound;anim.value=user.settings.animation;coords.value=user.settings.coords?'on':'off';modePref.value=user.settings.mode;saveSet.onclick=()=>{Object.assign(user.settings,{pieceTheme:pieceTheme.value,boardTheme:boardTheme.value,sound:sound.value,animation:anim.value,coords:coords.value==='on',mode:modePref.value,highlight:hl.value,arrow:ar.value,time:time.value});user.bio=bio.value;user.country=country.value;user.avatar=avatar.value;document.documentElement.style.setProperty('--hl',user.settings.highlight);document.documentElement.style.setProperty('--arrow',user.settings.arrow);document.body.classList.toggle('light',user.settings.mode==='light');save();renderAll();};logout.onclick=()=>{state.session=null;user=null;save();bootstrap();};}
+function renderHcf(){hcf.innerHTML=`<div class='grid g2'><div class='panel'><h3>Hamrock Chess Federation Hub</h3><p>Official queue, stricter anti-cheat, title tracking, and seasonal Swiss integration.</p><p>Current HCF: <b>${user.hcf}</b></p><div class='row'><button class='btn' id='joinH'>Join HCF queue</button><button class='btn' id='swissH'>Enter Swiss</button></div></div><div class='panel'><h3>Federation ladder</h3>${lbTable('hcf')}</div></div>`;joinH.onclick=()=>{mode='hcf';show('play');modeSel.value='hcf';};swissH.onclick=()=>alert('Registered for HCF Swiss event');}
+
+function renderAll(){renderDashboard();renderPlay();renderPuzzles();renderBots();renderAnalysis();renderLeaderboards();renderProfile();renderSettings();renderHcf();}
+function bootstrap(){setUser();requireAuth();if(!user)return;document.body.classList.toggle('light',user.settings.mode==='light');document.documentElement.style.setProperty('--hl',user.settings.highlight);document.documentElement.style.setProperty('--arrow',user.settings.arrow);renderAll();show('dashboard');}
+
+const nav=document.getElementById('nav');navItems.forEach(([id,label])=>{const b=document.createElement('button');b.textContent=label;b.dataset.id=id;b.onclick=()=>show(id);nav.appendChild(b);});
+document.querySelectorAll('[data-queue]').forEach(b=>b.onclick=()=>{if(!user)return;show('play');mode=b.dataset.queue;modeSel.value=mode;});
+bootstrap();

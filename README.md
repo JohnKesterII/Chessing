@@ -1,34 +1,26 @@
-# Chessing (Standalone Browser Build)
+# Chessing — Standalone Browser Platform
 
-This branch remakes Chessing as a **download-and-run** chess platform that starts by opening `index.html` directly in any modern browser.
+Chessing now runs by downloading the folder and opening `index.html` directly.
 
-## Run
+## Quick start
+1. Download this repository folder.
+2. Open `index.html` in a modern browser.
+3. Create an account in the built-in auth gate, then explore play, puzzles, bots, analysis, HCF hub, profile, and settings.
 
-1. Download or clone this folder.
-2. Double-click `index.html`.
-
-No build step, server, or install is required.
-
-## Included systems
-
-- Dual ratings: **Standard Elo** + **HCF competitive rating**
-- Functional chess board (legal move enforcement, move list, flip board, promotion to queen)
-- Queue modes (casual / Elo / HCF / bot)
-- Local bot play with timing + evaluation search
-- Puzzle module with real FEN positions, hint, retry, survival lives, and puzzle rating updates
-- Analysis studio with FEN load, top-3 local engine lines, evaluation, and PGN export
-- Profile with performance metrics
-- Standard + HCF leaderboards
-- HCF competitive hub
-- Persistent local storage for profile, ratings, and game history
+## What is implemented
+- Login/signup gate before accessing the full platform.
+- Dual rating ladders: **Standard Elo** and **HCF** with dedicated HCF hub and queue.
+- True 8x8 responsive board with exact square aspect ratio at all sizes.
+- Themeable piece rendering (Neo Rounded, Clean, Classic, Modern, Premium).
+- Personalization system (board theme, piece theme, sound, animation mode, coords, highlight/arrow colors, dark/light mode, profile fields, preferred controls).
+- Puzzle system with real FEN positions, themes, rating gains/losses, hint/retry/next, streak and rush counters.
+- Bots with multiple strengths and personalities.
+- Analysis workspace with Stockfish worker integration (`standalone/vendor/stockfish.js`), multipv lines, live depth stream, FEN load, and PGN copy.
+- Leaderboards, profile history, and persisted local state via `localStorage`.
 
 ## Architecture
-
-- `index.html` – shell and navigation
-- `standalone/styles.css` – UI system and responsive design
-- `standalone/app.js` – all app logic and state
-- `standalone/vendor/chess.js` – local chess rules engine (no CDN)
-
-## Notes
-
-This standalone build is designed for offline browser execution without backend infrastructure.
+- `index.html` – shell and page containers.
+- `standalone/styles.css` – full responsive design system.
+- `standalone/app.js` – auth, state, board logic, modes, settings, profiles, puzzles, analysis.
+- `standalone/vendor/chess.js` – legal move engine.
+- `standalone/vendor/stockfish.js` – Stockfish worker script for deeper analysis.

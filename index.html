@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="standalone/styles.css" />
 </head>
 <body>
+  <div id="authGate" class="auth-gate"></div>
   <div id="app">
     <aside class="sidebar">
       <h1>♟ Chessing</h1>
@@ -19,7 +20,6 @@
         <button data-queue="casual">Casual</button>
       </section>
     </aside>
-
     <main>
       <header class="topbar">
         <div>
@@ -27,12 +27,11 @@
           <p id="viewSubtitle">Play, train, review, and climb both ladders.</p>
         </div>
         <div class="pillset">
-          <span class="pill">Online 1,284</span>
+          <span class="pill" id="userChip">Offline</span>
           <span class="pill">Live games 423</span>
           <span class="pill">HCF Season 8</span>
         </div>
       </header>
-
       <section id="dashboard" class="view active"></section>
       <section id="play" class="view"></section>
       <section id="puzzles" class="view"></section>
@@ -40,6 +39,7 @@
       <section id="analysis" class="view"></section>
       <section id="leaderboards" class="view"></section>
       <section id="profile" class="view"></section>
+      <section id="settings" class="view"></section>
       <section id="hcf" class="view"></section>
     </main>
   </div>
